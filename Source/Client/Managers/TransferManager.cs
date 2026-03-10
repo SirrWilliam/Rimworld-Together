@@ -86,7 +86,7 @@ namespace GameClient.Managers
             else if (Find.Maps.Any(x => x.Tile == transferData._toTile))
             {
                 SessionHandler.IncomingManifest = transferData;
-                GetTransferedItemsToSettlement(TransferManagerHelper.GetAllTransferedItems(transferData));
+                GetTransferedItemsToSettlement(TransferManagerHelper.GetAllTransferedItems(transferData), invokeMessage:false);
             }
         }
 
@@ -195,9 +195,6 @@ namespace GameClient.Managers
 
         public static void GetTransferedItemsToSettlement(Thing[] things, bool success = true, bool customMap = true, bool invokeMessage = true)
         {
-            if (SessionHandler.IncomingManifest._transferMode == TransferMode.TransportPod)
-                invokeMessage = false;
-
             Action r1 = delegate
             {
                 Map map = null;
@@ -212,27 +209,32 @@ namespace GameClient.Managers
                 if (SessionHandler.IncomingManifest._transferMode == TransferMode.TransportPod)
                 {
                     int podCount = SessionHandler.IncomingManifest._podCount;
+                    // Calculate how many items each pod should carry
+                    // e.g. 5 items across 3 pods -> ceil(5/3) = 2 items per pod (last pod may carry fewer)
                     int itemsPerPod = Mathf.CeilToInt((float)things.Length / podCount);
                     IntVec3 lastDropCell = map.Center;
 
                     for (int i = 0; i < podCount; i++)
                     {
+                        // Calculate which items belong to this pod
                         Thing[] podThings = things.Skip(i * itemsPerPod).Take(itemsPerPod).ToArray();
                         if (podThings.Length == 0) break;
 
+                        // Pack items into the pod container
                         ActiveTransporterInfo podInfo = new ActiveTransporterInfo();
                         foreach (Thing thing in podThings)
-                        {
                             podInfo.innerContainer.TryAdd(thing);
-                        }
 
-                        lastDropCell = DropCellFinder.TryFindDropSpotNear(
+                        // Find a valid drop spot near the center of the map
+                        bool foundSpot = DropCellFinder.TryFindDropSpotNear(
                             map.Center,
-                            map,
-                            out IntVec3 result,
-                            false,
-                            false
-                        ) ? result : map.Center;
+                            map, 
+                            out IntVec3 dropCell,
+                            allowFogged: false, 
+                            canRoofPunch: false
+                        );
+
+                        lastDropCell = foundSpot ? dropCell : map.Center;
 
                         DropPodUtility.MakeDropPodAt(lastDropCell, map, podInfo);
                     }
@@ -245,7 +247,7 @@ namespace GameClient.Managers
                     if (senderSettlement != null)
                         senderName = senderSettlement.Name;
 
-                    string senderColored = senderSettlement?.Faction.TryGetGoodwill() switch
+                    string senderColored = senderSettlement?.Faction.GetFactionGoodwill() switch
                     {
                         Goodwill.Enemy => senderName.Colorize(ColoredText.FactionColor_Hostile),
                         Goodwill.Ally => senderName.Colorize(ColoredText.FactionColor_Ally),

@@ -29,7 +29,7 @@ namespace GameClient.Managers
             RT_Dialog_Wait.Instance.Close();
         }
 
-        public static Goodwill TryGetGoodwill(this Faction faction)
+        public static Goodwill GetFactionGoodwill(this Faction faction)
         {
             if (faction == SessionHandler.EnemyFaction){
                 return Goodwill.Enemy;
@@ -47,7 +47,7 @@ namespace GameClient.Managers
 
         public static LetterDef GetLetterDefFromGoodwill(this Faction faction)
         {
-            switch (faction.TryGetGoodwill())
+            switch (faction.GetFactionGoodwill())
             {
                 case Goodwill.Enemy: return LetterDefOf.ThreatBig;
                 case Goodwill.Ally: return LetterDefOf.PositiveEvent;
