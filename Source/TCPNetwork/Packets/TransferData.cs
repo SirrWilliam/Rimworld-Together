@@ -26,6 +26,8 @@ namespace TCPNetwork.Packets
 
         public List<string> _animals { get; set; } = new List<string>();
 
+        public List<string> _corpses { get; set; } = new List<string>();
+
         public List<string> _things { get; set; } = new List<string>();
     }
 }

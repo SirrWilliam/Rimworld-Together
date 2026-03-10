@@ -117,9 +117,10 @@ namespace GameClient.Managers
                 try
                 {
                     ThingOwner directlyHeldThings = pod.GetDirectlyHeldThings();
-                    for (int i = 0; i < directlyHeldThings.Count(); i++)
+                    List<Thing> things = directlyHeldThings.ToList();
+                    foreach (Thing thing in things)
                     {
-                        TransferManagerHelper.AddThingToTransferManifest(directlyHeldThings[i], directlyHeldThings[i].stackCount);
+                        TransferManagerHelper.AddThingToTransferManifest(thing, thing.stackCount);
                     }
                 }
                 catch { continue; }
@@ -203,8 +204,8 @@ namespace GameClient.Managers
 
                 foreach (Thing thing in things)
                 {
-                    if (thing is Pawn pawn && pawn.Dead)
-                        pawn.SetFactionDirect(null);
+                    if (thing is Corpse)
+                        thing.SetFactionDirect(null);
                     else if (thing.def.CanHaveFaction)
                         thing.SetFactionDirect(Faction.OfPlayer);
                 }
@@ -261,7 +262,9 @@ namespace GameClient.Managers
                     StringBuilder contents = new StringBuilder();
                     foreach (Thing thing in things)
                     {
-                        if (thing is Pawn pawn)
+                        if (thing is Corpse c)
+                            contents.AppendLine($"  - {c.InnerPawn.LabelCap} (Corpse)");
+                        else if (thing is Pawn pawn)
                             contents.AppendLine($"  - {pawn.LabelCap}");
                         else
                             contents.AppendLine($"  - {thing.LabelCapNoCount} x{thing.stackCount}");
@@ -445,9 +448,7 @@ namespace GameClient.Managers
         {
             if (thing is Corpse corpse)
             {
-                Pawn innerPawn = corpse.InnerPawn;
-
-                SessionHandler.OutgoingManifest._humans.Add(ScribeManager.SerializeToString(innerPawn, ScribeManager.SerializableType.Pawn));
+                SessionHandler.OutgoingManifest._corpses.Add(ScribeManager.SerializeToString(corpse.InnerPawn, ScribeManager.SerializableType.Pawn));
                 return;
             }
             if (ScriberH.CheckIfThingIsHuman(thing))
@@ -492,6 +493,14 @@ namespace GameClient.Managers
         public static Thing[] GetAllTransferedItems(TransferData transferData)
         {
             List<Thing> allTransferedItems = new List<Thing>();
+
+            foreach (string data in transferData._corpses)
+            {
+                Pawn deadPawn = ScribeManager.SerializeFromString<Pawn>(data);
+                Corpse corpse = (Corpse)ThingMaker.MakeThing(deadPawn.RaceProps.corpseDef);
+                corpse.InnerPawn = deadPawn;
+                allTransferedItems.Add(corpse);
+            }
 
             foreach (string file in transferData._humans)
             {
