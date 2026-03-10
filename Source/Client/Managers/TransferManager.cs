@@ -203,7 +203,10 @@ namespace GameClient.Managers
 
                 foreach (Thing thing in things)
                 {
-                    if (thing.def.CanHaveFaction) thing.SetFactionDirect(Faction.OfPlayer);
+                    if (thing is Pawn pawn && pawn.Dead)
+                        pawn.SetFactionDirect(null);
+                    else if (thing.def.CanHaveFaction)
+                        thing.SetFactionDirect(Faction.OfPlayer);
                 }
 
                 if (SessionHandler.IncomingManifest._transferMode == TransferMode.TransportPod)
@@ -445,8 +448,6 @@ namespace GameClient.Managers
                 Pawn innerPawn = corpse.InnerPawn;
 
                 SessionHandler.OutgoingManifest._humans.Add(ScribeManager.SerializeToString(innerPawn, ScribeManager.SerializableType.Pawn));
-
-                RimworldManager.RemovePawnFromGame(innerPawn);
                 return;
             }
             if (ScriberH.CheckIfThingIsHuman(thing))
