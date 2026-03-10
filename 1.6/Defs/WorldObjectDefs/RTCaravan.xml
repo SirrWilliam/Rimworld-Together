@@ -3,12 +3,14 @@
 	<WorldObjectDef>
 		<defName>RTCaravan</defName>
 		<label>Online Caravan</label>
-		<description>A caravan from another player</description>
+		<description>A caravan from another player.</description>
 		<worldObjectClass>GameClient.WorldObjects.RTCaravan</worldObjectClass>
 		<texture>World/WorldObjects/RTCaravan</texture>
-		<expandingIconTexture>World/WorldObjects/RTCaravan</expandingIconTexture>
+		<useDynamicDrawer>true</useDynamicDrawer>
 		<expandingIcon>true</expandingIcon>
-		<expandingIconPriority>95</expandingIconPriority>
+		<expandingIconTexture>World/WorldObjects/Expanding/RTCaravan</expandingIconTexture>
+	    <expandingIconPriority>100</expandingIconPriority>
+        <expandMore>false</expandMore>
 		<saved>false</saved>
 	</WorldObjectDef>
 </Defs>
