@@ -135,7 +135,7 @@ namespace GameClient.Dialogs
                 Close();
             }
 
-            else if (TransferMode == TransferMode.Pod)
+            else if (TransferMode == TransferMode.TransportPod)
             {
                 TransferManager.GetTransferedItemsToSettlement(ListedThings);
                 Close();

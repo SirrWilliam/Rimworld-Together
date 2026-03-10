@@ -14,7 +14,6 @@ using Shared.Files.Sites;
 using GameClient.Hooks.TCPNetwork;
 using TCPNetwork;
 
-
 namespace GameClient.Managers
 {
     //Class that handles settlement and site player goodwills
@@ -30,6 +29,33 @@ namespace GameClient.Managers
             RT_Dialog_Wait.Instance.Close();
         }
 
+        public static Goodwill TryGetGoodwill(this Faction faction)
+        {
+            if (faction == SessionHandler.EnemyFaction){
+                return Goodwill.Enemy;
+            }
+            else if (faction == SessionHandler.AllyFaction){
+                return Goodwill.Ally;
+            }
+            else if (faction == SessionHandler.NeutralFaction){
+                return Goodwill.Neutral;
+            }
+            else {
+                return Goodwill.Neutral;
+            }
+        }
+
+        public static LetterDef GetLetterDefFromGoodwill(this Faction faction)
+        {
+            switch (faction.TryGetGoodwill())
+            {
+                case Goodwill.Enemy: return LetterDefOf.ThreatBig;
+                case Goodwill.Ally: return LetterDefOf.PositiveEvent;
+                case Goodwill.Neutral: return LetterDefOf.NeutralEvent;
+                default: return LetterDefOf.NeutralEvent;
+            }
+        }
+      
         //Tries to request a goodwill change depending on the values given
 
         public static void TryRequestGoodwill(Goodwill type, GoodwillTarget target)
@@ -74,7 +100,6 @@ namespace GameClient.Managers
         }
 
         //Requests a structure goodwill change to the server
-
         public static void RequestChangeStructureGoodwill(int structureTile, Goodwill goodwill)
         {
             FactionGoodwillData factionGoodwillData = new FactionGoodwillData();
@@ -88,7 +113,6 @@ namespace GameClient.Managers
         }
 
         //Changes a structure goodwill from a packet
-
         public static void ChangeStructureGoodwill(FactionGoodwillData data)
         {
             ChangeSettlementGoodwills(data);
@@ -123,7 +147,6 @@ namespace GameClient.Managers
             foreach (SiteGoodwill _ in factionGoodwillData._sites) 
             {
                 RTSite site = (RTSite)Find.WorldObjects.AllWorldObjects.First(fetch => fetch.Tile == _.Tile && fetch is RTSite);
-
                 SiteManager.RecalculateSiteGoodwill(site, _.Goodwill);
             }
         }

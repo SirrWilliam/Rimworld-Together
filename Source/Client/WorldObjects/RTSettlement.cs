@@ -1,4 +1,5 @@
-﻿using GameClient.Dialogs;
+﻿using GameClient.Actions;
+using GameClient.Dialogs;
 using GameClient.Hooks.Synchronous;
 using GameClient.Managers;
 using GameClient.Misc;
@@ -44,6 +45,22 @@ namespace GameClient.WorldObjects
 
                 return cachedMat;
             }
+        }
+
+        public override IEnumerable<FloatMenuOption> GetTransportersFloatMenuOptions(
+            IEnumerable<IThingHolder> pods,
+            Action<PlanetTile, TransportersArrivalAction> launchAction)
+        {
+            yield return new FloatMenuOption(
+                $"Give as a gift to {this.Label}",
+            delegate
+            {
+                SessionHandler.ChosenSettlement = this;
+                launchAction(this.Tile, new RTTransportersArrivalAction_TransportPod(this));
+            },
+                MenuOptionPriority.Default,
+                null, null, 0f, null, null, true, 0
+            );
         }
 
         public override IEnumerable<Gizmo> GetGizmos()
