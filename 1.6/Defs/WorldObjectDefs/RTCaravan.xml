@@ -10,7 +10,7 @@
 		<expandingIcon>true</expandingIcon>
 		<expandingIconTexture>World/WorldObjects/Expanding/RTCaravan</expandingIconTexture>
 	    <expandingIconPriority>100</expandingIconPriority>
-        <expandMore>true</expandMore>
+        <expandMore>false</expandMore>
 		<saved>false</saved>
 	</WorldObjectDef>
 </Defs>
