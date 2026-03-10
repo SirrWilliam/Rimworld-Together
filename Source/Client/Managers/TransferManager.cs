@@ -339,6 +339,15 @@ namespace GameClient.Managers
 
         public static void AddThingToTransferManifest(Thing thing, int thingCount)
         {
+            if (thing is Corpse corpse)
+            {
+                Pawn innerPawn = corpse.InnerPawn;
+
+                SessionHandler.OutgoingManifest._humans.Add(ScribeManager.SerializeToString(innerPawn, ScribeManager.SerializableType.Pawn));
+
+                RimworldManager.RemovePawnFromGame(innerPawn);
+                return;
+            }
             if (ScriberH.CheckIfThingIsHuman(thing))
             {
                 Pawn pawn = thing as Pawn;
