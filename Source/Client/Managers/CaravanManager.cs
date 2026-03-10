@@ -53,15 +53,13 @@ namespace GameClient.Managers
                 {
                     Printer.Warning("Caravan to add already existed", LogImportanceMode.Verbose);
                 }
-
                 else
                 {
                     GuestCaravans.Add(file);
-
                     RTCaravan onlineCaravan = (RTCaravan)WorldObjectMaker.MakeWorldObject(RTWorldObjectDefOf.RTCaravan);
                     onlineCaravan.Tile = file.Tile;
                     onlineCaravan.SetFaction(SessionHandler.NeutralFaction);
-                    Find.World.worldObjects.AllWorldObjects.Add(onlineCaravan);
+                    Find.WorldObjects.Add(onlineCaravan);
                 }
             }
             catch (Exception e) { Printer.Error(e); }
@@ -77,10 +75,9 @@ namespace GameClient.Managers
                 {
                     RTCaravan toRemove = CaravanManagerH.GetAllExistingOnlineCaravans()
                         .FirstOrDefault(fetch => fetch.Tile == toFind.Tile);
-
                     if (toRemove != null)
                     {
-                        Find.World.worldObjects.AllWorldObjects.Remove(toRemove);
+                        Find.WorldObjects.Remove(toRemove);
                         GuestCaravans.Remove(toFind);
                     }
                 }
