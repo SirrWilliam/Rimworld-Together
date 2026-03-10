@@ -204,8 +204,7 @@ namespace GameClient.Managers
 
                 foreach (Thing thing in things)
                 {
-                    if (thing is Corpse)
-                        thing.SetFactionDirect(null);
+                    if (thing is Corpse) continue;
                     else if (thing.def.CanHaveFaction)
                         thing.SetFactionDirect(Faction.OfPlayer);
                 }
@@ -497,6 +496,7 @@ namespace GameClient.Managers
             foreach (string data in transferData._corpses)
             {
                 Pawn deadPawn = ScribeManager.SerializeFromString<Pawn>(data);
+                deadPawn.SetFactionDirect(null);
                 Corpse corpse = (Corpse)ThingMaker.MakeThing(deadPawn.RaceProps.corpseDef);
                 corpse.InnerPawn = deadPawn;
                 allTransferedItems.Add(corpse);
