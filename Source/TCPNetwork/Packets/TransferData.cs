@@ -6,11 +6,11 @@ namespace TCPNetwork.Packets
 {
     public class TransferData
     {
-        public enum TransferMode { Gift, Trade, Rebound, Pod }
+        public enum TransferMode { Gift, Trade, Rebound, TransportPod }
 
-        public enum TransferLocation { Caravan, Settlement, Pod }
+        public enum TransferLocation { Caravan, Settlement, TransportPod }
 
-        public enum TransferStepMode { TradeRequest, TradeAccept, TradeReject, TradeReRequest, TradeReAccept, TradeReReject, Recover, Pod }
+        public enum TransferStepMode { TradeRequest, TradeAccept, TradeReject, TradeReRequest, TradeReAccept, TradeReReject, Recover, TransportPod }
 
         public TransferStepMode _stepMode { get; set; } = TransferStepMode.TradeRequest;
 
@@ -19,6 +19,8 @@ namespace TCPNetwork.Packets
         public int _fromTile { get; set; } = -1;
 
         public int _toTile { get; set; } = -1;
+
+        public int _podCount { get; set; } = 1;
 
         public List<string> _humans { get; set; } = new List<string>();
 

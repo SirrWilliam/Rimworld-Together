@@ -1,22 +1,25 @@
 ﻿using GameClient.Core.Configs;
 using GameClient.Dialogs;
+using GameClient.Hooks.TCPNetwork;
 using GameClient.Misc;
-using TCPNetwork.Packets;
+using GameClient.WorldObjects;
 using RimWorld;
 using RimWorld.Planet;
 using Shared;
 using Shared.Files;
+using Shared.Misc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
+using TCPNetwork;
+using TCPNetwork.Packets;
+using UnityEngine;
 using Verse;
 using Verse.Sound;
-using static TCPNetwork.Packets.TransferData;
 using static Shared.CommonEnumerators;
-using Shared.Misc;
-using GameClient.Hooks.TCPNetwork;
-using TCPNetwork;
+using static TCPNetwork.Packets.TransferData;
 
 namespace GameClient.Managers
 {
@@ -38,10 +41,11 @@ namespace GameClient.Managers
                 case TransferStepMode.TradeAccept:
                     RT_Dialog_Wait.Instance.Close();
                     RT_Dialog_Base.PushNewDialog(new RT_Dialog_Message("MESSAGE", new string[] { "Transfer was a success!" }));
-                    if (data._transferMode == TransferMode.Pod) LaunchDropPods();
                     FinishTransfer(true);
                     break;
-
+                case TransferStepMode.TransportPod:
+                     SendTransportPod(data);
+                    break;
                 case TransferStepMode.TradeReject:
                     RT_Dialog_Wait.Instance.Close();
                     RT_Dialog_Base.PushNewDialog(new RT_Dialog_Message("ERROR", new string[] { "Player rejected the trade!" }));
@@ -72,6 +76,20 @@ namespace GameClient.Managers
             }
         }
 
+        public static void SendTransportPod(TransferData transferData)
+        {
+            if (Find.Maps.Any(x => x.Tile == transferData._fromTile))
+            {
+                LaunchDropPods();
+                FinishTransfer(false);
+            }
+            else if (Find.Maps.Any(x => x.Tile == transferData._toTile))
+            {
+                SessionHandler.IncomingManifest = transferData;
+                GetTransferedItemsToSettlement(TransferManagerHelper.GetAllTransferedItems(transferData), invokeMessage:false);
+            }
+        }
+
         //Takes transferable items from desired location
 
         public static void TakeTransferItems(TransferLocation transferLocation)
@@ -91,14 +109,14 @@ namespace GameClient.Managers
 
         public static void TakeTransferItemsFromPods(IEnumerable<IThingHolder> pods)
         {
-            SessionHandler.OutgoingManifest._transferMode = TransferMode.Pod;
+            SessionHandler.OutgoingManifest._transferMode = TransferMode.TransportPod;
+            SessionHandler.OutgoingManifest._podCount = pods.Count();
 
             foreach (IThingHolder pod in pods)
             {
                 try
                 {
                     ThingOwner directlyHeldThings = pod.GetDirectlyHeldThings();
-
                     for (int i = 0; i < directlyHeldThings.Count(); i++)
                     {
                         TransferManagerHelper.AddThingToTransferManifest(directlyHeldThings[i], directlyHeldThings[i].stackCount);
@@ -112,10 +130,13 @@ namespace GameClient.Managers
 
         public static void SendTransferRequestToServer(TransferLocation transferLocation)
         {
-            RT_Dialog_Base.PushNewDialog(new RT_Dialog_Wait("Waiting for transfer response"));
 
+
+             
             if (transferLocation == TransferLocation.Caravan)
             {
+                RT_Dialog_Base.PushNewDialog(new RT_Dialog_Wait("Waiting for transfer response"));
+
                 SessionHandler.ChosenCaravan = TradeSession.playerNegotiator.GetCaravan();
 
                 SessionHandler.OutgoingManifest._stepMode = TransferStepMode.TradeRequest;
@@ -127,6 +148,8 @@ namespace GameClient.Managers
 
             else if (transferLocation == TransferLocation.Settlement)
             {
+                RT_Dialog_Base.PushNewDialog(new RT_Dialog_Wait("Waiting for transfer response"));
+
                 RT_Dialog_ItemListing.Instance.Close();
 
                 SessionHandler.OutgoingManifest._stepMode = TransferStepMode.TradeReRequest;
@@ -136,9 +159,9 @@ namespace GameClient.Managers
                 Network.ServerEndpoint.EnqueuePacket(PacketHeader.TransferManager, SessionHandler.OutgoingManifest);
             }
 
-            else if (transferLocation == TransferLocation.Pod)
+            else if (transferLocation == TransferLocation.TransportPod)
             {
-                SessionHandler.OutgoingManifest._stepMode = TransferStepMode.TradeRequest;
+                SessionHandler.OutgoingManifest._stepMode = TransferStepMode.TransportPod;
                 SessionHandler.OutgoingManifest._fromTile = Find.AnyPlayerHomeMap.Tile;
                 SessionHandler.OutgoingManifest._toTile = SessionHandler.ChosenSettlement.Tile;
 
@@ -181,10 +204,83 @@ namespace GameClient.Managers
                 foreach (Thing thing in things)
                 {
                     if (thing.def.CanHaveFaction) thing.SetFactionDirect(Faction.OfPlayer);
-                    RimworldManager.PlaceThingIntoMap(thing, map, TransferManagerHelper.GetTransferLocationInMap(map), true);
                 }
 
-                FinishTransfer(success);
+                if (SessionHandler.IncomingManifest._transferMode == TransferMode.TransportPod)
+                {
+                    int podCount = SessionHandler.IncomingManifest._podCount;
+                    // Calculate how many items each pod should carry
+                    // e.g. 5 items across 3 pods -> ceil(5/3) = 2 items per pod (last pod may carry fewer)
+                    int itemsPerPod = Mathf.CeilToInt((float)things.Length / podCount);
+                    IntVec3 lastDropCell = map.Center;
+
+                    for (int i = 0; i < podCount; i++)
+                    {
+                        // Calculate which items belong to this pod
+                        Thing[] podThings = things.Skip(i * itemsPerPod).Take(itemsPerPod).ToArray();
+                        if (podThings.Length == 0) break;
+
+                        // Pack items into the pod container
+                        ActiveTransporterInfo podInfo = new ActiveTransporterInfo();
+                        foreach (Thing thing in podThings)
+                            podInfo.innerContainer.TryAdd(thing);
+
+                        // Find a valid drop spot near the center of the map
+                        bool foundSpot = DropCellFinder.TryFindDropSpotNear(
+                            map.Center,
+                            map, 
+                            out IntVec3 dropCell,
+                            allowFogged: false, 
+                            canRoofPunch: false
+                        );
+
+                        lastDropCell = foundSpot ? dropCell : map.Center;
+
+                        DropPodUtility.MakeDropPodAt(lastDropCell, map, podInfo);
+                    }
+
+                    string senderName = "Unknown";
+                    RTSettlement senderSettlement = Find.WorldObjects.AllWorldObjects
+                        .OfType<RTSettlement>()
+                        .FirstOrDefault(s => s.Tile == SessionHandler.IncomingManifest._fromTile);
+
+                    if (senderSettlement != null)
+                        senderName = senderSettlement.Name;
+
+                    string senderColored = senderSettlement?.Faction.GetFactionGoodwill() switch
+                    {
+                        Goodwill.Enemy => senderName.Colorize(ColoredText.FactionColor_Hostile),
+                        Goodwill.Ally => senderName.Colorize(ColoredText.FactionColor_Ally),
+                        Goodwill.Neutral => senderName.Colorize(ColoredText.FactionColor_Neutral),
+                        _ => senderName
+                    };
+
+                    StringBuilder contents = new StringBuilder();
+                    foreach (Thing thing in things)
+                    {
+                        if (thing is Pawn pawn)
+                            contents.AppendLine($"  - {pawn.LabelCap}");
+                        else
+                            contents.AppendLine($"  - {thing.LabelCapNoCount} x{thing.stackCount}");
+                    }
+
+                    Find.LetterStack.ReceiveLetter(
+                        "Transport Pod Arrived",
+                        $"A transport pod from {senderColored} has arrived at your settlement.\n\nContents:\n{contents}",
+                        senderSettlement?.Faction.GetLetterDefFromGoodwill() ?? LetterDefOf.NeutralEvent,
+                        new GlobalTargetInfo(lastDropCell, map)
+                    );
+
+                    FinishTransfer(false);
+                }
+                else
+                {
+                    foreach (Thing thing in things)
+                    {
+                        RimworldManager.PlaceThingIntoMap(thing, map, TransferManagerHelper.GetTransferLocationInMap(map), true);
+                    }
+                    FinishTransfer(success);
+                }
             };
 
             if (invokeMessage)
@@ -248,8 +344,13 @@ namespace GameClient.Managers
                     };
 
                     string description = string.Empty;
-                    if (transferData._transferMode == TransferMode.Trade) description = "You are receiving a trade request";
-                    else description = "You are receiving a gift request";
+                    if (transferData._transferMode == TransferMode.Trade)
+                    {
+                        description = "You are receiving a trade request";
+                    }
+                    else if (transferData._transferMode == TransferMode.Gift) {
+                        description = "You are receiving a gift request";
+                    }
 
                     RT_Dialog_Base.PushNewDialog(new RT_Dialog_Message("MESSAGE", new string[] { description }, r1));
                 }
@@ -303,7 +404,7 @@ namespace GameClient.Managers
                 Network.ServerEndpoint.EnqueuePacket(PacketHeader.TransferManager, SessionHandler.IncomingManifest);
             }
 
-            else if (transferMode == TransferMode.Pod)
+            else if (transferMode == TransferMode.TransportPod)
             {
                 //Nothing should happen here
             }
